@@ -7,6 +7,7 @@
 #include "Registry.h"
 #include "itkCommand.h"
 #include <mutex>
+#include <vector>
 
 class GlobalUIModel;
 class ImageWrapperBase;
@@ -205,6 +206,21 @@ public:
   /** Display URL */
   irisSimplePropertyAccessMacro(ServerDisplayURL, std::string)
 
+  /**
+   * How results returned by the deep learning model are merged into the segmentation.
+   *   EDIT_MODE_UNION:      only add voxels; existing voxels of the active label are never erased
+   *   EDIT_MODE_REFINE_OWN: the AI may only erase voxels it created in the current interaction
+   *                         session; active-label voxels that existed before are protected
+   *   EDIT_MODE_REPLACE:    every active-label voxel not in the AI result is erased (legacy)
+   */
+  enum DLSEditMode
+  {
+    EDIT_MODE_UNION = 0,
+    EDIT_MODE_REFINE_OWN,
+    EDIT_MODE_REPLACE
+  };
+  irisSimplePropertyAccessMacro(EditMode, DLSEditMode)
+
   /** Load preferences from registry */
   void LoadPreferences(Registry &folder);
 
@@ -327,6 +343,14 @@ protected:
 
   using LabelSelection = int;
   LabelSelection m_LabelState = -1;
+
+  // Edit mode (persisted in user preferences)
+  SmartPtr<ConcretePropertyModel<DLSEditMode, TrivialDomain>> m_EditModeModel;
+
+  // One byte per voxel: 1 if the voxel held the active label before the current AI
+  // object was started. Used by EDIT_MODE_REFINE_OWN to protect pre-existing labels
+  // from PaintAsBackground(). Rebuilt when a new object starts; cleared on reset.
+  std::vector<unsigned char> m_ProtectMask;
 
   bool GetServerValueAndRange(int &value, ServerDomain *domain);
   void SetServerValue(int value);

@@ -8,6 +8,7 @@
 #include "IRISException.h"
 #include "UIReporterDelegates.h"
 #include "SegmentationUpdateIterator.h"
+#include "itkImageRegionConstIterator.h"
 #include "AllPurposeProgressAccumulator.h"
 #include "base64.h"
 #include "QtCursorOverride.h"
@@ -260,6 +261,9 @@ DeepLearningSegmentationModel::DeepLearningSegmentationModel()
 
   m_ProxyURLModel = NewSimpleConcreteProperty(std::string());
 
+  // How AI results are merged into the segmentation. Default protects pre-existing voxels.
+  m_EditModeModel = NewSimpleConcreteProperty(EDIT_MODE_REFINE_OWN);
+
   // Substatuses
   m_NetworkStatusModel =
     NewSimpleConcreteProperty(dls_model::NetworkStatus(dls_model::NETWORK_NOT_CONNECTED));
@@ -479,6 +483,12 @@ DeepLearningSegmentationModel::LoadPreferences(Registry &folder)
     m_ServerProperties.push_back(spm);
   }
 
+  // Read the edit mode (unknown or missing values fall back to the default)
+  int edit_mode = folder["EditMode"][(int) EDIT_MODE_REFINE_OWN];
+  if (edit_mode < EDIT_MODE_UNION || edit_mode > EDIT_MODE_REPLACE)
+    edit_mode = EDIT_MODE_REFINE_OWN;
+  m_EditModeModel->SetValue((DLSEditMode) edit_mode);
+
   // Read the active server index
   int server_index = folder["ActiveServerIndex"][0];
   if(server_index < 0 || server_index >= m_ServerProperties.size())
@@ -508,6 +518,9 @@ DeepLearningSegmentationModel::SavePreferences(Registry &folder)
 
   // Write the selected server
   folder["ActiveServerIndex"] << m_ServerIndex;
+
+  // Write the edit mode
+  folder["EditMode"] << (int) m_EditModeModel->GetValue();
 }
 
 DeepLearningServerPropertiesModel *
@@ -748,6 +761,7 @@ DeepLearningSegmentationModel::SetSourceImage(ImageWrapperBase *layer)
 
     m_ActiveLayer = sel;
     m_LabelState = -1;
+    m_ProtectMask.clear();
     // pdel->Hide();
   }
 }
@@ -767,6 +781,10 @@ DeepLearningSegmentationModel::ResetInteractions()
     throw IRISException("Failed to reset interactions");
   }
   std::cout << "RESET INTERACTIONS" << std::endl;
+
+  // The server forgot everything about the current object, so the protection
+  // snapshot must be taken again at the next interaction
+  m_ProtectMask.clear();
 }
 
 
@@ -822,30 +840,74 @@ DeepLearningSegmentationModel::UpdateSegmentation(const char *json, const char *
     std::cout << "After gzip decoding: " << result_raw.size() << std::endl;
     std::cout << "Expected: " << expected_size << std::endl;
 
+    // Check that the size of raw data matches the buffer size, otherwise the
+    // iteration below would read past the end of the result
+    if (result_raw.size() != expected_size)
+      throw IRISException("DLS server returned segmentation that does not match the size of "
+                          "the image (%zu voxels received, %zu expected)",
+                          result_raw.size(), expected_size);
+
     // Create an ITK image of the segmentation for this label
     using ImageType = itk::Image<char, 3>;
     ImageType::Pointer result_img = ImageType::New();
+    auto region = seg->GetImageBase()->GetBufferedRegion();
     result_img->CopyInformation(seg->GetImageBase());
-    result_img->SetRegions(seg->GetImageBase()->GetBufferedRegion());
+    result_img->SetRegions(region);
     result_img->GetPixelContainer()->SetImportPointer(result_raw.data(), result_raw.size(), false);
 
-    // Merge this result with the segmentation
-    m_LabelState = gs->GetDrawingColorLabel();
+    // How should the result be merged into the segmentation?
+    LabelType   active_label = gs->GetDrawingColorLabel();
+    DLSEditMode mode = m_EditModeModel->GetValue();
 
-    // The result is floating point values converted to a string
-    SegmentationUpdateIterator itVol(seg,
-                                     seg->GetImageBase()->GetBufferedRegion(),
-                                     gs->GetDrawingColorLabel(),
-                                     gs->GetDrawOverFilter());
-    itk::ImageRegionIterator<ImageType> itSrc(result_img, seg->GetImageBase()->GetBufferedRegion());
-
-    for (; !itVol.IsAtEnd(); ++itVol, ++itSrc)
+    // A new AI "object" starts when the active label changed, when the source image
+    // changed (SetSourceImage resets m_LabelState) or when interactions were reset
+    // (m_ProtectMask cleared). The callers (AcceptPolygon, CommitDrawing) undo their
+    // temporary drawing before calling us, so at this point the segmentation is in its
+    // pre-interaction state and we can snapshot which active-label voxels existed
+    // before the AI touched anything. In REFINE_OWN mode these voxels are never erased.
+    bool new_object = (m_LabelState != (LabelSelection) active_label) ||
+                      (m_ProtectMask.size() != expected_size);
+    if (mode == EDIT_MODE_REFINE_OWN && new_object)
     {
-      if (itSrc.Get() > 0.0)
-        itVol.PaintAsForeground();
-      else
-        itVol.PaintAsBackground();
+      m_ProtectMask.assign(expected_size, 0);
+      itk::ImageRegionConstIterator<LabelImageWrapper::ImageType> itSeg(seg->GetImage(), region);
+      size_t n_protected = 0;
+      for (size_t i = 0; !itSeg.IsAtEnd(); ++itSeg, ++i)
+      {
+        if (itSeg.Get() == active_label)
+        {
+          m_ProtectMask[i] = 1;
+          n_protected++;
+        }
+      }
+      std::cout << "DLS edit mode REFINE_OWN: protecting " << n_protected
+                << " pre-existing voxels of label " << active_label << std::endl;
     }
+    bool use_protect = (mode == EDIT_MODE_REFINE_OWN && m_ProtectMask.size() == expected_size);
+
+    // Merge this result with the segmentation
+    m_LabelState = active_label;
+
+    SegmentationUpdateIterator itVol(seg, region, active_label, gs->GetDrawOverFilter());
+    itk::ImageRegionIterator<ImageType> itSrc(result_img, region);
+
+    size_t i = 0;
+    for (; !itVol.IsAtEnd(); ++itVol, ++itSrc, ++i)
+    {
+      if (itSrc.Get() > 0)
+      {
+        // Voxel is part of the AI result: paint with the active label (respects paint-over)
+        itVol.PaintAsForeground();
+      }
+      else if (mode == EDIT_MODE_REPLACE || (use_protect && !m_ProtectMask[i]))
+      {
+        // Voxel is not part of the AI result: erase the active label, unless the voxel
+        // is protected (REFINE_OWN) or we are only adding (UNION)
+        itVol.PaintAsBackground();
+      }
+    }
+    std::cout << "DLS edit mode " << (int) mode << ": " << itVol.GetNumberOfChangedVoxels()
+              << " voxels changed" << std::endl;
     if (itVol.Finalize(commit_name))
     {
       m_ParentModel->GetDriver()->RecordCurrentLabelUse();

@@ -73,6 +73,14 @@ void PolygonToolPanel::SetModel(GlobalUIModel *model)
   // Connect with the deep learning model
   auto *dls = m_Model->GetDeepLearningSegmentationModel();
   makeCoupling(ui->outDLStatus, dls->GetServerStatusModel(), MiniConnectionStatusQLabelValueTraits());
+
+  // Couple the AI edit mode radio buttons (Add / Refine / Replace)
+  std::map<DeepLearningSegmentationModel::DLSEditMode, QAbstractButton *> rmap_edit_mode{
+    { DeepLearningSegmentationModel::EDIT_MODE_UNION, ui->btnDLEditAdd },
+    { DeepLearningSegmentationModel::EDIT_MODE_REFINE_OWN, ui->btnDLEditRefine },
+    { DeepLearningSegmentationModel::EDIT_MODE_REPLACE, ui->btnDLEditReplace }
+  };
+  makeRadioGroupCoupling(ui->grpDLEditMode, rmap_edit_mode, dls->GetEditModeModel());
 }
 
 void
