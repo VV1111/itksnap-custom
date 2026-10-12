@@ -1,4 +1,4 @@
-name: Build
+name: Build custom ITK-SNAP (DLS edit mode, Windows only)
 
 on:
   workflow_dispatch:
@@ -40,23 +40,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04,macos-13,macos-14,windows-2022]
+        os: [windows-2022]
         itk_ver: [ 'v5.4.0' ]
         vtk_ver: [ '9.3.1' ]
         qt_ver: [ '6.8.1' ]
         include:
-          - os: ubuntu-22.04
-            qt_host: linux
-            qt_arch: linux_gcc_64
-            ctest_cmd: xvfb-run -a ctest
-          - os: macos-13
-            qt_host: mac
-            qt_arch: clang_64
-            ctest_cmd: ctest
-          - os: macos-14
-            qt_host: mac
-            qt_arch: clang_64
-            ctest_cmd: ctest
           - os: windows-2022
             qt_host: windows
             qt_arch: win64_msvc2022_64
@@ -283,7 +271,7 @@ jobs:
           ${{ matrix.ctest_cmd }} -D ExperimentalSubmit
 
       - name: ITK-SNAP Dashboard -- Gatekeeper
-        if: ${{ steps.ctest-config.outcome != 'success' || steps.ctest-submit.outcome != 'success' }}
+        if: ${{ steps.ctest-config.outcome != 'success' }}
         run: exit -1          
 
       # Cache the ITK-SNAP build
@@ -300,31 +288,6 @@ jobs:
         shell: bash
         run: |
           echo "${{github.workspace}}/vcpkg/installed/x64-windows-release/bin" >> $GITHUB_PATH
-
-      # On MacOS, setup keychain for application signing
-      # The notarization keys are from https://appstoreconnect.apple.com/access/integrations/api
-      - name: Setup codesign keychain
-        if: ${{ runner.os == 'MacOS' }}
-        working-directory: ${{github.workspace}}/itksnap/build
-        env:
-          # Private key from the .p12 file (export certificate & key to .p12)
-          CODESIGN_P12_KEY: ${{ secrets.SNAP_MACOSX_CODESIGN_P12_KEY }}
-          # Unique substring of the certificate name (the number part is ok)
-          CODESIGN_CERT: "${{ secrets.SNAP_MACOS_DEV_CERTIFICATE_NAME }}"
-          # Notarization pkey/keyid/issuer triplet (pkey is base64 encoded)
-          NOTARIZE_KEY: ${{ secrets.SNAP_MACOS_NOTARIZE_PRIVATE_KEY }}
-          NOTARIZE_KEY_ID: ${{ secrets.SNAP_MACOS_NOTARIZE_KEY_ID }}
-          NOTARIZE_ISSUER: ${{ secrets.SNAP_MACOS_NOTARIZE_ISSUER_UUID }}
-        run: |
-          security create-keychain -p "" build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "" build.keychain
-          security import ../Utilities/MacOS/apple_developer_for_github.p12 -k build.keychain -P "$CODESIGN_P12_KEY" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
-          echo $NOTARIZE_KEY | base64 -d > notarize_key
-          xcrun notarytool store-credentials -k notarize_key -d $NOTARIZE_KEY_ID -i $NOTARIZE_ISSUER --keychain /Users/runner/Library/Keychains/build.keychain-db itksnap_notarize
-          rm -rf notarize_key
-          cmake -DSNAP_MACOS_NOTARYTOOL_PROFILE=itksnap_notarize -DSNAP_MACOS_KEYCHAIN=/Users/runner/Library/Keychains/build.keychain-db -DSNAP_MACOSX_CODESIGN_CERT=$CODESIGN_CERT .
 
       - name: Setup tmate session
         uses: mxschmitt/action-tmate@v3
@@ -351,42 +314,3 @@ jobs:
         with:
           name: ${{steps.package_itksnap.outputs.package_file}}
           path: ${{github.workspace}}/itksnap/build/${{steps.package_itksnap.outputs.package_file}}
-
-      - name: Upload to sourceforge
-        working-directory: ${{github.workspace}}/itksnap/build
-        shell: bash
-        env:
-          PRIVATE_KEY: ${{ secrets.SNAP_SOURCEFORGE_PRIVATE_KEY }}
-          PUBLIC_KEY: ${{ secrets.SNAP_SOURCEFORGE_PUBLIC_KEY }}
-          USER: ${{ secrets.SNAP_SOURCEFORGE_PUBLIC_USERNAME }}
-        run: |
-          mkdir -p $HOME/.ssh && chmod 700 $HOME/.ssh
-          echo $PUBLIC_KEY | base64 -d > $HOME/.ssh/sfkey.pub && chmod 600 $HOME/.ssh/sfkey.pub
-          echo $PRIVATE_KEY | base64 -d > $HOME/.ssh/sfkey && chmod 600 $HOME/.ssh/sfkey
-          touch $HOME/.ssh/config && chmod 600 $HOME/.ssh/config
-          echo "StrictHostKeyChecking=no" >> $HOME/.ssh/config
-          echo "BatchMode=yes" >> $HOME/.ssh/config
-          echo "IdentityFile=~/.ssh/sfkey" >> $HOME/.ssh/config
-          cmake -DSCP_USERNAME=$USER .
-          cmake --build . --target itksnap_upload_experimental
-
-      - name: Upload named release to sourceforge
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload_release }}
-        working-directory: ${{github.workspace}}/itksnap/build
-        shell: bash
-        run: |
-          cmake --build . --target itksnap_upload_release
-
-      - name: Cleanup secrets
-        if: ${{ always() }}
-        shell: bash
-        working-directory: ${{github.workspace}}/itksnap/build
-        run: |
-          rm -rf $HOME/.ssh/sfkey.pub $HOME/.ssh/sfkey
-          ${{ runner.os == 'MacOS' && 'security delete-keychain build.keychain' || 'echo na' }}          
-        
-      
-
-      
-
-
