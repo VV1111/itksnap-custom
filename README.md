@@ -9,7 +9,7 @@ Everything else is unchanged from ITK-SNAP 4.4.0.
 
 ## Download
 
-Packages for Windows, macOS (Apple silicon) and Ubuntu 24.04+ are on the [Releases page](https://github.com/VV1111/itksnap-custom/releases). They are built by GitHub Actions from the `feature/dls-edit-mode` branch. The macOS package is not code-signed: right-click → **Open** on first launch. There is no ready-made package for Intel Macs — see [Building](#building).
+Packages for Windows, macOS (Apple silicon, macOS 14+) and Ubuntu 24.04+ are on the [Releases page](https://github.com/VV1111/itksnap-custom/releases). They are built by GitHub Actions from the `feature/dls-edit-mode` branch. The macOS package is not code-signed: right-click → **Open** on first launch. There is no ready-made package for Intel Macs — see [Building](#building).
 
 ## Branches
 
@@ -33,7 +33,7 @@ Installation for each system and how to run your own server: [Install & setup](h
 3. In the **Actions** tab, run **Build custom ITK-SNAP** on the `feature/dls-edit-mode` branch.
 4. Download the package from the run's **Artifacts** (kept for 90 days). The first run takes 1–3 hours while ITK and VTK are compiled.
 
-To build locally, follow the [official instructions](http://www.itksnap.org/pmwiki/pmwiki.php?n=Documentation.BuildingITK-SNAP) (ITK 5.4.0, VTK 9.3.1, Qt 6.8.1).
+To build locally, follow the [official instructions](http://www.itksnap.org/pmwiki/pmwiki.php?n=Documentation.BuildingITK-SNAP) (ITK 5.4.0, VTK 9.5.2, Qt 6.8.1).
 
 ---
 
