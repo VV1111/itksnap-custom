@@ -29,7 +29,7 @@ Installation for each system and how to run your own server: [Install & setup](h
 `.github/workflows/build.yml` builds the Windows, macOS (Apple silicon) and Ubuntu packages on GitHub Actions. To build your own copy:
 
 1. Fork this repository.
-2. For an Intel Mac, add `macos-15-intel` to the `os:` list in `.github/workflows/build.yml` (its settings are already in the file).
+2. For an Intel Mac, uncomment the four `macos-15-intel` lines under `include:` in `.github/workflows/build.yml`.
 3. In the **Actions** tab, run **Build custom ITK-SNAP** on the `feature/dls-edit-mode` branch.
 4. Download the package from the run's **Artifacts** (kept for 90 days). The first run takes 1–3 hours while ITK and VTK are compiled.
 

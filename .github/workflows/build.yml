@@ -40,7 +40,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Intel Macs are not built by default; add macos-15-intel here to build one
         os: [ubuntu-24.04, macos-15, windows-2022]
         itk_ver: [ 'v5.4.0' ]
         vtk_ver: [ '9.3.1' ]
@@ -50,11 +49,12 @@ jobs:
             qt_host: linux
             qt_arch: linux_gcc_64
             ctest_cmd: xvfb-run -a ctest
-          # Intel Mac (only used when macos-15-intel is in the os list above)
-          - os: macos-15-intel
-            qt_host: mac
-            qt_arch: clang_64
-            ctest_cmd: ctest
+          # Intel Mac: not built by default. An include entry whose os is not in the
+          # list above adds a job of its own, so uncomment these four lines to build one.
+          # - os: macos-15-intel
+          #   qt_host: mac
+          #   qt_arch: clang_64
+          #   ctest_cmd: ctest
           # Apple silicon Mac
           - os: macos-15
             qt_host: mac
