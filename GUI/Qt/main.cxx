@@ -1047,13 +1047,17 @@ main(int argc, char *argv[])
       locale = QLocale();
     }
 
+    // Custom build: the interface stays in English unless a language is requested
+    // with --lang (official ITK-SNAP follows the system language)
+    bool use_translation = !argdata.gui_language.empty();
+
     QTranslator translator;
-    if(translator.load(locale, "itksnap", "_", ":/i18n"))
+    if(use_translation && translator.load(locale, "itksnap", "_", ":/i18n"))
     {
       qDebug() << "Loaded translator for locale" << locale.name();
       QCoreApplication::installTranslator(&translator);
     }
-    else
+    else if(use_translation)
     {
       qDebug() << "Failed to load translator for locale" << locale.name();
     }
@@ -1067,12 +1071,12 @@ main(int argc, char *argv[])
       translator_sys_path = translator_sys_path.replace("Contents/translations","Contents/Resources/translations");
     }
 #endif
-    if (translator_sys.load(locale, "qt", "_", translator_sys_path))
+    if (use_translation && translator_sys.load(locale, "qt", "_", translator_sys_path))
     {
       qDebug() << "Loaded qtbase translator for locale" << locale.name();
       QCoreApplication::installTranslator(&translator_sys);
     }
-    else
+    else if (use_translation)
     {
       qDebug() << "Failed to load qtbase translator for locale" << locale.name();
       qDebug() << "  Search paths considered: " << translator_sys_path;
