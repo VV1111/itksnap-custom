@@ -1,3 +1,42 @@
+# ITK-SNAP 4.4 — custom build with AI edit mode
+
+This is [ITK-SNAP](http://www.itksnap.org) 4.4.0 with two changes for AI-assisted segmentation with [nnInteractive](https://github.com/MIC-DKFZ/nnInteractive):
+
+1. **AI edit mode** — three buttons (**Add / Refine / Replace**) in the AI section of the Paintbrush and Polygon tools decide what an AI correction may erase. In official ITK-SNAP, every AI correction erases all voxels of the active label that are not in the newest prediction, so a second correction can cut gaps into the first result. See [AI edit modes](https://vv1111.github.io/guidance/itksnap-dls/edit-modes) for exactly what each mode keeps.
+2. **English interface by default** — official ITK-SNAP follows the system language. This build stays in English; use `--lang zh_CN` (or another code) for a translation.
+
+Everything else is unchanged from ITK-SNAP 4.4.0.
+
+## Download
+
+Packages for Windows, macOS (Apple silicon) and Ubuntu 24.04+ are on the [Releases page](https://github.com/VV1111/itksnap-custom/releases). They are built by GitHub Actions from the `feature/dls-edit-mode` branch. The macOS package is not code-signed: right-click → **Open** on first launch. There is no ready-made package for Intel Macs — see [Building](#building).
+
+## Branches
+
+| Branch | Contents | Use it for |
+| --- | --- | --- |
+| `feature/dls-edit-mode` (default) | ITK-SNAP 4.4.0 + AI edit mode + English default + build workflow | The custom ITK-SNAP — the main branch |
+| `baseline-4.4.0-ci` | Unmodified ITK-SNAP 4.4.0 + the same build workflow (Windows only) | An official-equivalent build, for comparing with the custom one |
+
+## AI server
+
+ITK-SNAP is only the client. The AI runs in a separate [itksnap-dls](https://github.com/pyushkevich/itksnap-dls) server on a computer with an NVIDIA GPU. The edit-mode buttons work with any standard itksnap-dls server; nothing changes on the server side.
+
+Installation for each system and how to run your own server: [Install & setup](https://vv1111.github.io/guidance/itksnap-dls/install).
+
+## Building
+
+`.github/workflows/build.yml` builds the Windows, macOS (Apple silicon) and Ubuntu packages on GitHub Actions. To build your own copy:
+
+1. Fork this repository.
+2. For an Intel Mac, add `macos-15-intel` to the `os:` list in `.github/workflows/build.yml` (its settings are already in the file).
+3. In the **Actions** tab, run **Build custom ITK-SNAP** on the `feature/dls-edit-mode` branch.
+4. Download the package from the run's **Artifacts** (kept for 90 days). The first run takes 1–3 hours while ITK and VTK are compiled.
+
+To build locally, follow the [official instructions](http://www.itksnap.org/pmwiki/pmwiki.php?n=Documentation.BuildingITK-SNAP) (ITK 5.4.0, VTK 9.3.1, Qt 6.8.1).
+
+---
+
 ITK-SNAP README
 -----------------
 
