@@ -9,7 +9,9 @@ Everything else is unchanged from ITK-SNAP 4.4.0.
 
 ## Download
 
-Packages for Windows, macOS (Apple silicon, macOS 14+) and Ubuntu 24.04+ are on the [Releases page](https://github.com/VV1111/itksnap-custom/releases). They are built by GitHub Actions from the `feature/dls-edit-mode` branch. The macOS package is not code-signed: right-click → **Open** on first launch. There is no ready-made package for Intel Macs — see [Building](#building).
+Packages are on the [Releases page](https://github.com/VV1111/itksnap-custom/releases). They are built by GitHub Actions from the `feature/dls-edit-mode` branch.
+
+So far only the **Windows** package has been tested successfully. A macOS package is built, but it does not open yet because of Apple's security assessment of apps that are not signed and notarized, so it is not offered for now. The Ubuntu 24.04+ package has not been tested yet.
 
 ## Branches
 
@@ -26,12 +28,11 @@ Installation for each system and how to run your own server: [Install & setup](h
 
 ## Building
 
-`.github/workflows/build.yml` builds the Windows, macOS (Apple silicon) and Ubuntu packages on GitHub Actions. To build your own copy:
+`.github/workflows/build.yml` builds the Windows, Ubuntu and macOS packages on GitHub Actions (only the Windows package has been tested). To build your own copy:
 
 1. Fork this repository.
-2. For an Intel Mac, uncomment the four `macos-15-intel` lines under `include:` in `.github/workflows/build.yml`.
-3. In the **Actions** tab, run **Build custom ITK-SNAP** on the `feature/dls-edit-mode` branch.
-4. Download the package from the run's **Artifacts** (kept for 90 days). The first run takes 1–3 hours while ITK and VTK are compiled.
+2. In the **Actions** tab, run **Build custom ITK-SNAP** on the `feature/dls-edit-mode` branch.
+3. Download the package from the run's **Artifacts** (kept for 90 days). The first run takes 1–3 hours while ITK and VTK are compiled.
 
 To build locally, follow the [official instructions](http://www.itksnap.org/pmwiki/pmwiki.php?n=Documentation.BuildingITK-SNAP) (ITK 5.4.0, VTK 9.5.2, Qt 6.8.1).
 
